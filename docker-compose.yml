@@ -1,0 +1,17 @@
+services:
+  canopy:
+    build: .
+    ports:
+      - "8080:8080"
+      - "17883:17883"
+    volumes:
+      - canopy-data:/app/data
+    environment:
+      CANOPY_SECRET_KEY: "${CANOPY_SECRET_KEY:-change-me-in-production}"
+      CANOPY_DATABASE_URL: "sqlite+aiosqlite:///./data/canopy.db"
+      CANOPY_MQTT_USE_TLS: "false"
+      CANOPY_MQTT_REQUIRE_AUTH: "true"
+    restart: unless-stopped
+
+volumes:
+  canopy-data:

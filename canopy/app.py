@@ -1,0 +1,117 @@
+"""FastAPI application factory."""
+
+import logging
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import bcrypt as _bcrypt
+from sqlalchemy import select
+
+from .api import (
+    audit_routes,
+    auth_routes,
+    command_routes,
+    fleet_routes,
+    package_routes,
+    system_routes,
+    websocket_routes,
+)
+from .api.websocket_routes import setup_broker_ws_hooks
+from .broker.server import CanopyBroker
+from .config import settings
+from .db.engine import async_session, engine
+from .db.models import Base, User
+from .fleet.manager import FleetManager
+
+logger = logging.getLogger("canopy")
+
+broker: CanopyBroker | None = None
+fleet_manager: FleetManager | None = None
+
+
+async def _ensure_admin_user():
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.role == "admin"))
+        if result.scalar_one_or_none():
+            return
+        admin = User(
+            username="admin",
+            password_hash=_bcrypt.hashpw(b"canopy", _bcrypt.gensalt()).decode(),
+            role="admin",
+            email="admin@localhost",
+        )
+        session.add(admin)
+        await session.commit()
+        logger.info("Created default admin user (username: admin, password: canopy)")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global broker, fleet_manager
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    await _ensure_admin_user()
+
+    cert_path = Path(settings.mqtt_cert_path) if settings.mqtt_cert_path else None
+    key_path = Path(settings.mqtt_key_path) if settings.mqtt_key_path else None
+
+    broker = CanopyBroker(
+        host=settings.mqtt_host,
+        port=settings.mqtt_port,
+        cert_path=cert_path,
+        key_path=key_path,
+        require_auth=settings.mqtt_require_auth,
+        use_tls=settings.mqtt_use_tls,
+    )
+
+    fleet_manager = FleetManager(broker)
+    fleet_manager.set_session_factory(async_session)
+    fleet_manager.setup_broker_hooks()
+
+    setup_broker_ws_hooks(broker)
+    command_routes.set_broker(broker)
+    system_routes.set_broker(broker)
+
+    await broker.start()
+    logger.info("Canopy started")
+
+    yield
+
+    await broker.stop()
+    await engine.dispose()
+    logger.info("Canopy stopped")
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title="Canopy",
+        description="Enterprise fleet management for Unitree robots",
+        version="0.1.0",
+        lifespan=lifespan,
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    app.include_router(auth_routes.router, prefix="/api/v1")
+    app.include_router(fleet_routes.router, prefix="/api/v1")
+    app.include_router(command_routes.router, prefix="/api/v1")
+    app.include_router(package_routes.router, prefix="/api/v1")
+    app.include_router(audit_routes.router, prefix="/api/v1")
+    app.include_router(system_routes.router, prefix="/api/v1")
+    app.include_router(websocket_routes.router)
+
+    frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+    if frontend_dist.exists():
+        app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
+
+    return app

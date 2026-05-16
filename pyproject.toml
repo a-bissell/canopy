@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "canopy"
+version = "0.1.0"
+description = "Enterprise fleet management platform for Unitree robots"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Alex Bissell" },
+]
+keywords = ["unitree", "mqtt", "fleet", "robot", "ota", "management"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Web Environment",
+    "Intended Audience :: System Administrators",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy[asyncio]>=2.0",
+    "aiosqlite>=0.20",
+    "alembic>=1.13",
+    "python-jose[cryptography]>=3.3",
+    "bcrypt>=4.0",
+    "python-multipart>=0.0.9",
+    "pydantic-settings>=2.0",
+]
+
+[project.optional-dependencies]
+telemetry = ["cyclonedds>=0.10,<0.11"]
+video = ["aiortc", "opencv-python-headless"]
+all = [
+    "cyclonedds>=0.10,<0.11",
+    "aiortc",
+    "opencv-python-headless",
+]
+
+[project.scripts]
+canopy = "canopy.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["canopy*"]
