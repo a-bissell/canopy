@@ -1,48 +1,80 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom';
-import { clearToken } from '../api/client';
-import { Shield, LayoutDashboard, Package, FileText, LogOut } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { api, clearToken } from '../api/client';
+import { getTheme, toggleTheme } from '../theme';
+import { Sun, Moon } from 'lucide-react';
+
+const TABS = [
+  { to: '/', label: 'Fleet', end: true },
+  { to: '/packages', label: 'Packages', end: false },
+  { to: '/deployments', label: 'Deployments', end: false },
+  { to: '/audit', label: 'Audit', end: false },
+];
 
 export default function Layout() {
   const navigate = useNavigate();
+  const [online, setOnline] = useState<number | null>(null);
+  const [light, setLight] = useState(getTheme() === 'light');
 
-  const logout = () => {
-    clearToken();
-    navigate('/login');
-  };
+  useEffect(() => {
+    let alive = true;
+    const poll = () =>
+      api.fleetStatus().then((s) => { if (alive) setOnline(s.online); }).catch(() => {});
+    poll();
+    const t = setInterval(poll, 10000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+
+  const logout = () => { clearToken(); navigate('/login'); };
+  const flipTheme = () => setLight(toggleTheme() === 'light');
+
+  const connected = online !== null;
 
   return (
-    <div className="flex h-screen bg-gray-950 text-gray-100">
-      <aside className="w-56 bg-gray-900 border-r border-gray-800 flex flex-col">
-        <div className="p-4 border-b border-gray-800">
-          <Link to="/" className="flex items-center gap-2 text-lg font-semibold text-white no-underline">
-            <Shield className="w-6 h-6 text-emerald-400" />
-            Canopy
-          </Link>
+    <div className="app">
+      <div className="topbar">
+        <div className="logo">CANOPY <span>FLEET</span></div>
+        <div className="top-r">
+          <div className="indicators">
+            <div className="ind">
+              <div className={`dot ${connected ? 'dot-g' : 'dot-x'}`} />
+              <span>{connected ? 'Broker online' : 'Connecting…'}</span>
+            </div>
+            <div className="ind">
+              <div className={`dot ${online ? 'dot-a' : 'dot-x'}`} />
+              <span>{online ?? 0} online</span>
+            </div>
+          </div>
+          <div className="top-actions">
+            <button className="btn btn-theme" onClick={flipTheme} title="Toggle light/dark">
+              {light ? <Moon size={14} /> : <Sun size={14} />}
+            </button>
+            <button className="btn btn-ghost" onClick={logout}>Sign out</button>
+          </div>
         </div>
-        <nav className="flex-1 p-3 space-y-1">
-          <NavLink to="/" icon={<LayoutDashboard className="w-4 h-4" />} label="Dashboard" />
-          <NavLink to="/packages" icon={<Package className="w-4 h-4" />} label="Packages" />
-          <NavLink to="/audit" icon={<FileText className="w-4 h-4" />} label="Audit Log" />
-        </nav>
-        <div className="p-3 border-t border-gray-800">
-          <button onClick={logout} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors">
-            <LogOut className="w-4 h-4" />
-            Sign out
-          </button>
-        </div>
-      </aside>
-      <main className="flex-1 overflow-auto">
+      </div>
+
+      <nav className="tabs">
+        {TABS.map((t) => (
+          <NavLink
+            key={t.to}
+            to={t.to}
+            end={t.end}
+            className={({ isActive }) => `tab${isActive ? ' active' : ''}`}
+          >
+            {t.label}
+          </NavLink>
+        ))}
+      </nav>
+
+      <div className="app-content">
         <Outlet />
-      </main>
-    </div>
-  );
-}
+      </div>
 
-function NavLink({ to, icon, label }: { to: string; icon: React.ReactNode; label: string }) {
-  return (
-    <Link to={to} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors no-underline">
-      {icon}
-      {label}
-    </Link>
+      <div className="bottombar">
+        <span><span className={`live-dot${connected ? '' : ' off'}`} />Live · polling 10s</span>
+        <span>{window.location.host}</span>
+      </div>
+    </div>
   );
 }

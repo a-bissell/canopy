@@ -39,5 +39,8 @@ alembic/versions/__pycache__/
 # Research / standalone tools (not part of the package)
 upk_tool.py
 
+# Design reference imported from another project
+template.html
+
 # Docker
 docker-compose.override.yml

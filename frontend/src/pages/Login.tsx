@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, setTokens } from '../api/client';
-import { Shield } from 'lucide-react';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -26,43 +25,30 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <div className="w-full max-w-sm">
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <Shield className="w-10 h-10 text-emerald-400" />
-          <h1 className="text-3xl font-bold text-white">Canopy</h1>
-        </div>
-        <form onSubmit={handleSubmit} className="bg-gray-900 border border-gray-800 rounded-lg p-6 space-y-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:outline-none focus:border-emerald-500"
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
-        </form>
-        <p className="text-center text-xs text-gray-600 mt-4">Fleet management for Unitree robots</p>
-      </div>
+    <div className="login-overlay">
+      <form className="login-box" onSubmit={handleSubmit}>
+        <div className="logo">CANOPY <span>FLEET</span></div>
+        <input
+          className="login-input"
+          type="text"
+          placeholder="Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          autoFocus
+        />
+        <input
+          className="login-input"
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        {error && <div className="err-text" style={{ textAlign: 'center' }}>{error}</div>}
+        <button type="submit" className="btn btn-primary" disabled={loading} style={{ justifyContent: 'center', padding: '10px' }}>
+          {loading ? 'Signing in…' : 'Access'}
+        </button>
+        <div className="login-sub">Fleet management for Unitree robots</div>
+      </form>
     </div>
   );
 }
