@@ -1,3 +1,5 @@
+import { getToken } from './client';
+
 type MessageHandler = (data: any) => void;
 
 export class FleetSocket {
@@ -7,7 +9,9 @@ export class FleetSocket {
 
   connect(path: string) {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${proto}//${window.location.host}${path}`;
+    const token = getToken();
+    const qs = token ? `?token=${encodeURIComponent(token)}` : '';
+    const url = `${proto}//${window.location.host}${path}${qs}`;
     this.ws = new WebSocket(url);
 
     this.ws.onmessage = (event) => {

@@ -11,7 +11,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 RUN pip install --no-cache-dir .
 
 COPY canopy/ canopy/
@@ -19,6 +19,6 @@ COPY --from=frontend-build /build/dist frontend/dist/
 
 RUN mkdir -p data/packages data/certs
 
-EXPOSE 8080 17883
+EXPOSE 8080 17883 8899
 
 CMD ["python", "-m", "canopy"]

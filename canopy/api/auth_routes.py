@@ -109,7 +109,7 @@ async def change_password(
 ):
     result = await session.execute(select(User).where(User.id == current_user.user_id))
     user = result.scalar_one_or_none()
-    if not user or not bcrypt.verify(body.current_password, user.password_hash):
+    if not user or not _bcrypt.checkpw(body.current_password.encode(), user.password_hash.encode()):
         raise HTTPException(status_code=400, detail="Current password incorrect")
     user.password_hash = _bcrypt.hashpw(body.new_password.encode(), _bcrypt.gensalt()).decode()
     await session.commit()

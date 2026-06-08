@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, setToken } from '../api/client';
+import { api, setTokens } from '../api/client';
 import { Shield } from 'lucide-react';
 
 export default function Login() {
@@ -16,7 +16,7 @@ export default function Login() {
     setError('');
     try {
       const res = await api.login(username, password);
-      setToken(res.access_token);
+      setTokens(res.access_token, res.refresh_token);
       navigate('/');
     } catch (err: any) {
       setError(err.message || 'Login failed');

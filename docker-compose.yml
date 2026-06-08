@@ -4,6 +4,7 @@ services:
     ports:
       - "8080:8080"
       - "17883:17883"
+      - "8899:8899"
     volumes:
       - canopy-data:/app/data
     environment:
@@ -11,6 +12,9 @@ services:
       CANOPY_DATABASE_URL: "sqlite+aiosqlite:///./data/canopy.db"
       CANOPY_MQTT_USE_TLS: "false"
       CANOPY_MQTT_REQUIRE_AUTH: "true"
+      # Host robots use to reach the OTA file server; set to this host's
+      # robot-reachable address in a real deployment.
+      CANOPY_UPK_ADVERTISE_HOST: "${CANOPY_UPK_ADVERTISE_HOST:-127.0.0.1}"
     restart: unless-stopped
 
 volumes:
