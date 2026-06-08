@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
 
+    # CORS — origins allowed to call the API from a browser.
+    # The bundled SPA is served same-origin, so this only matters for the
+    # standalone Vite dev server. Override via CANOPY_CORS_ORIGINS (JSON list).
+    cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
     # MQTT Broker
     mqtt_host: str = "0.0.0.0"
     mqtt_port: int = 17883

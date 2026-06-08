@@ -7,9 +7,25 @@ import time
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from ..auth.jwt_handler import decode_token
+
 logger = logging.getLogger("canopy.ws")
 
 router = APIRouter()
+
+
+async def _authenticate_ws(ws: WebSocket) -> bool:
+    """Validate the access token passed as a ?token= query param.
+
+    Browsers can't set Authorization headers on a WebSocket handshake, so the
+    token rides in the query string. Closes the socket with 4401 on failure.
+    """
+    token = ws.query_params.get("token")
+    payload = decode_token(token) if token else None
+    if payload is None or payload.get("type") != "access":
+        await ws.close(code=4401)
+        return False
+    return True
 
 
 class WebSocketHub:
@@ -110,6 +126,8 @@ def setup_broker_ws_hooks(broker):
 
 @router.websocket("/ws/fleet")
 async def ws_fleet(ws: WebSocket):
+    if not await _authenticate_ws(ws):
+        return
     await hub.connect_fleet(ws)
     try:
         while True:
@@ -122,6 +140,8 @@ async def ws_fleet(ws: WebSocket):
 
 @router.websocket("/ws/events")
 async def ws_events(ws: WebSocket):
+    if not await _authenticate_ws(ws):
+        return
     await hub.connect_events(ws)
     try:
         while True:

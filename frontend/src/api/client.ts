@@ -1,6 +1,6 @@
 const BASE = '/api/v1';
 
-function getToken(): string | null {
+export function getToken(): string | null {
   return localStorage.getItem('canopy_token');
 }
 
