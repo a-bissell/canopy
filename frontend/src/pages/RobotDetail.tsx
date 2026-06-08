@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
-import { ArrowLeft, Send } from 'lucide-react';
 
 export default function RobotDetail() {
   const { serial } = useParams<{ serial: string }>();
+  const navigate = useNavigate();
   const [robot, setRobot] = useState<any>(null);
-  const [command, setCommand] = useState('');
+  const [command, setCommand] = useState('{"cmd": "reportVersion", "msgId": "1"}');
   const [commandResult, setCommandResult] = useState('');
   const [tab, setTab] = useState<'info' | 'command'>('info');
 
@@ -25,86 +25,70 @@ export default function RobotDetail() {
     }
   };
 
-  if (!robot) return <div className="p-6 text-gray-400">Loading...</div>;
+  if (!robot) return <div className="page muted">Loading…</div>;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <Link to="/" className="text-gray-400 hover:text-white transition-colors">
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-white font-mono">{robot.serial}</h1>
-          <p className="text-sm text-gray-400">{robot.nickname || 'No nickname set'}</p>
+    <div className="page">
+      <div className="page-head">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span className="link" onClick={() => navigate('/')}>← Fleet</span>
+          <div>
+            <div className="page-title mono" style={{ textTransform: 'none' }}>{robot.serial}</div>
+            <div className="page-sub">{robot.nickname || 'No nickname set'}</div>
+          </div>
+          <span className={`item-status is-${robot.status || 'offline'}`} style={{ marginLeft: 4 }}>{robot.status}</span>
         </div>
-        <span className={`ml-4 px-2 py-0.5 rounded text-xs font-medium ${robot.status === 'online' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-500/20 text-gray-400'}`}>
-          {robot.status}
-        </span>
       </div>
 
-      <div className="flex gap-2 border-b border-gray-800">
-        <TabButton active={tab === 'info'} onClick={() => setTab('info')}>Info</TabButton>
-        <TabButton active={tab === 'command'} onClick={() => setTab('command')}>Command</TabButton>
+      <div className="subtabs">
+        <button className={`subtab${tab === 'info' ? ' active' : ''}`} onClick={() => setTab('info')}>Info</button>
+        <button className={`subtab${tab === 'command' ? ' active' : ''}`} onClick={() => setTab('command')}>Command</button>
       </div>
 
       {tab === 'info' && (
-        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-3">
-          <InfoRow label="Serial" value={robot.serial} />
-          <InfoRow label="Model" value={robot.model || 'Unknown'} />
-          <InfoRow label="Firmware" value={robot.firmware_version || 'Unknown'} />
-          <InfoRow label="IP Address" value={robot.ip_address || 'Unknown'} />
-          <InfoRow label="Group" value={robot.group_name || 'None'} />
-          <InfoRow label="First Seen" value={robot.first_seen ? new Date(robot.first_seen).toLocaleString() : '—'} />
-          <InfoRow label="Last Seen" value={robot.last_seen ? new Date(robot.last_seen).toLocaleString() : '—'} />
+        <div className="card" style={{ maxWidth: 560 }}>
+          <Row k="Serial" v={robot.serial} />
+          <Row k="Model" v={robot.model || 'Unknown'} />
+          <Row k="Firmware" v={robot.firmware_version || 'Unknown'} />
+          <Row k="IP Address" v={robot.ip_address || 'Unknown'} />
+          <Row k="Group" v={robot.group_name || 'None'} />
+          <Row k="First Seen" v={robot.first_seen ? new Date(robot.first_seen).toLocaleString() : '—'} />
+          <Row k="Last Seen" v={robot.last_seen ? new Date(robot.last_seen).toLocaleString() : '—'} />
         </div>
       )}
 
       {tab === 'command' && (
-        <div className="space-y-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-            <label className="block text-sm text-gray-400 mb-2">MQTT Command (JSON)</label>
+        <div style={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="field">
+            <span className="field-label">MQTT Command (JSON)</span>
             <textarea
+              className="textarea"
+              style={{ minHeight: 120 }}
               value={command}
               onChange={(e) => setCommand(e.target.value)}
               placeholder='{"cmd": "reportVersion", "msgId": "1"}'
-              className="w-full h-32 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm font-mono focus:outline-none focus:border-emerald-500 resize-none"
             />
             <button
+              className="btn btn-primary"
+              style={{ alignSelf: 'flex-start' }}
               onClick={sendCommand}
               disabled={robot.status !== 'online'}
-              className="mt-3 flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Send className="w-4 h-4" />
               Send
             </button>
           </div>
-          {commandResult && (
-            <pre className="bg-gray-900 border border-gray-800 rounded-lg p-4 text-sm text-gray-300 font-mono overflow-auto">
-              {commandResult}
-            </pre>
-          )}
+          {commandResult && <pre className="code-pre">{commandResult}</pre>}
         </div>
       )}
     </div>
   );
 }
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function Row({ k, v }: { k: string; v: string }) {
   return (
-    <button
-      onClick={onClick}
-      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${active ? 'border-emerald-400 text-white' : 'border-transparent text-gray-400 hover:text-white'}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className="text-gray-200 font-mono">{value}</span>
+    <div className="info-row">
+      <span className="k">{k}</span>
+      <span className="v mono">{v}</span>
     </div>
   );
 }

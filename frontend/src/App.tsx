@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Packages from './pages/Packages';
 import PackageBuilder from './pages/PackageBuilder';
+import Deployments from './pages/Deployments';
 import AuditLog from './pages/AuditLog';
 import RobotDetail from './pages/RobotDetail';
 
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="robot/:serial" element={<RobotDetail />} />
           <Route path="packages" element={<Packages />} />
           <Route path="packages/new" element={<PackageBuilder />} />
+          <Route path="deployments" element={<Deployments />} />
           <Route path="audit" element={<AuditLog />} />
         </Route>
       </Routes>

@@ -1,14 +1,37 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { FleetSocket } from '../api/websocket';
-import { Bot, Wifi, WifiOff, AlertCircle, RefreshCw } from 'lucide-react';
+
+interface FeedItem {
+  id: number;
+  time: string;
+  kind: string;   // badge class suffix: success | error | message | system | task | warning
+  label: string;
+  message: string;
+}
+
+const STATUS_BADGE: Record<string, string> = {
+  online: 'ib-green', offline: 'ib-gray', updating: 'ib-blue', error: 'ib-red',
+};
+
+let _feedSeq = 0;
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [status, setStatus] = useState({ total: 0, online: 0, offline: 0, updating: 0, error: 0 });
   const [robots, setRobots] = useState<any[]>([]);
-  const [events, setEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [feed, setFeed] = useState<FeedItem[]>([]);
+  const [target, setTarget] = useState('*');
+  const [cmdType, setCmdType] = useState('reportVersion');
+  const [cmdInput, setCmdInput] = useState('');
+  const feedRef = useRef<HTMLDivElement>(null);
+
+  const push = (kind: string, label: string, message: string) =>
+    setFeed((prev) => [
+      ...prev.slice(-199),
+      { id: _feedSeq++, time: nowTime(), kind, label, message },
+    ]);
 
   const refresh = async () => {
     try {
@@ -16,7 +39,6 @@ export default function Dashboard() {
       setStatus(s);
       setRobots(r);
     } catch {}
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -25,129 +47,137 @@ export default function Dashboard() {
 
     const ws = new FleetSocket();
     ws.connect('/ws/events');
-    ws.onMessage((data) => {
-      setEvents((prev) => [data, ...prev].slice(0, 50));
+    ws.onMessage((ev) => {
+      if (ev?.type === 'connect') push('success', 'CONNECT', `${ev.serial} joined the fleet`);
+      else if (ev?.type === 'disconnect') push('error', 'DISCONNECT', `${ev.serial} left the fleet`);
+      else if (ev?.type === 'message') push('message', 'MSG', `${ev.serial} · ${ev.topic ?? ''}`);
       refresh();
     });
 
-    return () => {
-      clearInterval(interval);
-      ws.disconnect();
-    };
+    push('system', 'SYSTEM', 'Console connected');
+    return () => { clearInterval(interval); ws.disconnect(); };
   }, []);
 
-  if (loading) return <div className="p-6 text-gray-400">Loading...</div>;
+  useEffect(() => {
+    const el = feedRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [feed]);
 
-  return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Fleet Dashboard</h1>
-        <button onClick={refresh} className="p-2 text-gray-400 hover:text-white transition-colors">
-          <RefreshCw className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Stats bar */}
-      <div className="grid grid-cols-5 gap-4">
-        <StatCard label="Total" value={status.total} icon={<Bot className="w-5 h-5" />} color="text-gray-300" />
-        <StatCard label="Online" value={status.online} icon={<Wifi className="w-5 h-5" />} color="text-emerald-400" />
-        <StatCard label="Offline" value={status.offline} icon={<WifiOff className="w-5 h-5" />} color="text-gray-500" />
-        <StatCard label="Updating" value={status.updating} icon={<RefreshCw className="w-5 h-5" />} color="text-blue-400" />
-        <StatCard label="Error" value={status.error} icon={<AlertCircle className="w-5 h-5" />} color="text-red-400" />
-      </div>
-
-      <div className="grid grid-cols-3 gap-6">
-        {/* Robot table */}
-        <div className="col-span-2 bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-800">
-            <h2 className="text-sm font-medium text-gray-300">Robots</h2>
-          </div>
-          {robots.length === 0 ? (
-            <div className="p-8 text-center text-gray-500 text-sm">
-              No robots connected. Point a robot's MQTT DNS at this server.
-            </div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-gray-500 text-xs border-b border-gray-800">
-                  <th className="px-4 py-2 text-left">Serial</th>
-                  <th className="px-4 py-2 text-left">Nickname</th>
-                  <th className="px-4 py-2 text-left">Status</th>
-                  <th className="px-4 py-2 text-left">IP</th>
-                  <th className="px-4 py-2 text-left">Last Seen</th>
-                </tr>
-              </thead>
-              <tbody>
-                {robots.map((r) => (
-                  <tr key={r.serial} className="border-b border-gray-800/50 hover:bg-gray-800/50 transition-colors">
-                    <td className="px-4 py-2">
-                      <Link to={`/robot/${r.serial}`} className="text-emerald-400 hover:text-emerald-300 no-underline font-mono text-xs">
-                        {r.serial}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-2 text-gray-300">{r.nickname || '—'}</td>
-                    <td className="px-4 py-2">
-                      <StatusBadge status={r.status} />
-                    </td>
-                    <td className="px-4 py-2 text-gray-400 font-mono text-xs">{r.ip_address || '—'}</td>
-                    <td className="px-4 py-2 text-gray-500 text-xs">{r.last_seen ? timeAgo(r.last_seen) : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {/* Event feed */}
-        <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-800">
-            <h2 className="text-sm font-medium text-gray-300">Live Events</h2>
-          </div>
-          <div className="max-h-96 overflow-y-auto">
-            {events.length === 0 ? (
-              <div className="p-4 text-gray-500 text-xs text-center">Waiting for events...</div>
-            ) : (
-              events.map((ev, i) => (
-                <div key={i} className="px-4 py-2 border-b border-gray-800/50 text-xs">
-                  <span className={ev.type === 'connect' ? 'text-emerald-400' : ev.type === 'disconnect' ? 'text-red-400' : 'text-gray-400'}>
-                    {ev.type}
-                  </span>
-                  <span className="ml-2 text-gray-500">{ev.serial}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color: string }) {
-  return (
-    <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-      <div className={`flex items-center gap-2 mb-1 ${color}`}>
-        {icon}
-        <span className="text-2xl font-bold">{value}</span>
-      </div>
-      <span className="text-xs text-gray-500">{label}</span>
-    </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    online: 'bg-emerald-500/20 text-emerald-400',
-    offline: 'bg-gray-500/20 text-gray-400',
-    updating: 'bg-blue-500/20 text-blue-400',
-    error: 'bg-red-500/20 text-red-400',
+  const onTypeChange = (t: string) => {
+    setCmdType(t);
+    if (t === 'reportVersion') setCmdInput('{"cmd": "reportVersion", "msgId": "1"}');
+    else setCmdInput('');
   };
+
+  const send = async () => {
+    let payload: any;
+    try {
+      payload = JSON.parse(cmdInput.trim() || '{}');
+    } catch {
+      push('error', 'ERROR', 'Command must be valid JSON');
+      return;
+    }
+    const dest = target === '*' ? 'ALL' : target;
+    try {
+      if (target === '*') await api.broadcast(payload);
+      else await api.sendCommand(target, payload);
+      push('task', 'CMD', `${payload.cmd ?? 'command'} → ${dest}`);
+      setCmdInput(cmdType === 'reportVersion' ? '{"cmd": "reportVersion", "msgId": "1"}' : '');
+    } catch (e: any) {
+      push('error', 'ERROR', e.message || 'Send failed');
+    }
+  };
+
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors[status] || colors.offline}`}>
-      <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${status === 'online' ? 'bg-emerald-400' : status === 'error' ? 'bg-red-400' : 'bg-gray-500'}`} />
-      {status}
-    </span>
+    <>
+      <div className="stats">
+        <Stat v={status.total} l="Total" cls="hl" />
+        <Stat v={status.online} l="Online" cls="ok" />
+        <Stat v={status.offline} l="Offline" cls="" />
+        <Stat v={status.updating} l="Updating" cls="warn" />
+        <Stat v={status.error} l="Error" cls="bad" />
+      </div>
+
+      <div className="main">
+        {/* Live event feed */}
+        <div className="feed-panel">
+          <div className="panel-head">
+            <span>Live feed</span>
+            <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 10 }} onClick={() => setFeed([])}>Clear</button>
+          </div>
+          <div className="feed" ref={feedRef}>
+            {feed.length === 0 ? (
+              <div className="empty">Waiting for events…</div>
+            ) : feed.map((f) => (
+              <div className="entry entry-new" key={f.id}>
+                <div className="entry-time">{f.time}</div>
+                <div className={`badge b-${f.kind}`}>{f.label}</div>
+                <div className="entry-body">{f.message}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Robots + command panel */}
+        <div className="sidebar">
+          <div className="panel-head"><span>Robots</span><span>{robots.length}</span></div>
+          <div className="item-list">
+            {robots.length === 0 ? (
+              <div className="empty">No robots connected.<br />Point a robot's MQTT DNS at this server.</div>
+            ) : robots.map((r) => (
+              <div className="item" key={r.serial} onClick={() => navigate(`/robot/${r.serial}`)}>
+                <div className={`item-badge ${STATUS_BADGE[r.status] || 'ib-gray'}`}>
+                  {(r.status || '?')[0].toUpperCase()}
+                </div>
+                <div className="item-info">
+                  <div className="item-title">{r.nickname || r.serial}</div>
+                  <div className="item-meta">{r.ip_address || '—'} · {r.last_seen ? timeAgo(r.last_seen) : 'never'}</div>
+                </div>
+                <span className={`item-status is-${r.status || 'offline'}`}>{r.status}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="cmd-panel">
+            <div className="cmd-label">Command</div>
+            <div className="cmd-row">
+              <select className="cmd-sel" value={target} onChange={(e) => setTarget(e.target.value)}>
+                <option value="*">All robots</option>
+                {robots.map((r) => <option key={r.serial} value={r.serial}>{r.nickname || r.serial}</option>)}
+              </select>
+              <select className="cmd-sel" value={cmdType} onChange={(e) => onTypeChange(e.target.value)}>
+                <option value="reportVersion">reportVersion</option>
+                <option value="custom">Custom JSON</option>
+              </select>
+            </div>
+            <div className="cmd-row">
+              <input
+                className="cmd-input"
+                placeholder='{"cmd": "..."}'
+                value={cmdInput}
+                onChange={(e) => setCmdInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
+              />
+              <button className="btn btn-primary" style={{ padding: '6px 16px' }} onClick={send}>Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
   );
+}
+
+function Stat({ v, l, cls }: { v: number; l: string; cls: string }) {
+  return (
+    <div className="stat">
+      <div className={`stat-v ${cls}`}>{v}</div>
+      <div className="stat-l">{l}</div>
+    </div>
+  );
+}
+
+function nowTime(): string {
+  return new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 function timeAgo(iso: string): string {
