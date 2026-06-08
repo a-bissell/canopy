@@ -34,8 +34,13 @@ class Settings(BaseSettings):
     data_dir: Path = Path("./data")
     package_dir: Path = Path("./data/packages")
 
-    # UPK file server (for OTA delivery)
+    # UPK file server (serves .upk packages to robots for OTA delivery)
+    upk_server_host: str = "0.0.0.0"      # bind address
     upk_server_port: int = 8899
+    # Host/IP that robots use to reach the UPK file server. This goes into the
+    # download URL inside the updateModule command, so it must be reachable
+    # *from the robot*. Override via CANOPY_UPK_ADVERTISE_HOST in production.
+    upk_advertise_host: str = "127.0.0.1"
 
 
 settings = Settings()

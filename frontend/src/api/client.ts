@@ -55,6 +55,10 @@ export const api = {
   broadcast: (payload: any) => request<any>('/command/broadcast', { method: 'POST', body: JSON.stringify({ payload }) }),
   listPackages: () => request<any[]>('/packages'),
   createPackage: (data: any) => request<any>('/packages', { method: 'POST', body: JSON.stringify(data) }),
+  listDeployments: () => request<any[]>('/deployments'),
+  getDeployment: (id: string) => request<any>(`/deployments/${id}`),
+  createDeployment: (data: { package_id: string; target_type: string; target_value?: string; strategy?: string }) =>
+    request<any>('/deployments', { method: 'POST', body: JSON.stringify(data) }),
   auditLogs: (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     return request<{ items: any[]; total: number; page: number; page_size: number }>(`/audit/logs${qs}`);

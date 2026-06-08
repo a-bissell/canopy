@@ -19,6 +19,6 @@ COPY --from=frontend-build /build/dist frontend/dist/
 
 RUN mkdir -p data/packages data/certs
 
-EXPOSE 8080 17883
+EXPOSE 8080 17883 8899
 
 CMD ["python", "-m", "canopy"]

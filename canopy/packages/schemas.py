@@ -61,5 +61,10 @@ class DeploymentTargetOut(BaseModel):
     started_at: datetime | None
     completed_at: datetime | None
     error_message: str | None
+    download_count: int
 
     model_config = {"from_attributes": True}
+
+
+class DeploymentDetailOut(DeploymentOut):
+    targets: list[DeploymentTargetOut]

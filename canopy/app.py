@@ -1,5 +1,6 @@
 """FastAPI application factory."""
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -14,6 +15,7 @@ from .api import (
     audit_routes,
     auth_routes,
     command_routes,
+    deployment_routes,
     fleet_routes,
     package_routes,
     system_routes,
@@ -25,11 +27,15 @@ from .config import settings
 from .db.engine import async_session, engine
 from .db.models import Base, User
 from .fleet.manager import FleetManager
+from .packages.deployment import DeploymentService
+from .packages.file_server import UPKFileServer
 
 logger = logging.getLogger("canopy")
 
 broker: CanopyBroker | None = None
 fleet_manager: FleetManager | None = None
+upk_server: UPKFileServer | None = None
+deployment_service: DeploymentService | None = None
 
 
 async def _ensure_admin_user():
@@ -50,7 +56,7 @@ async def _ensure_admin_user():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global broker, fleet_manager
+    global broker, fleet_manager, upk_server, deployment_service
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -76,11 +82,34 @@ async def lifespan(app: FastAPI):
     command_routes.set_broker(broker)
     system_routes.set_broker(broker)
 
+    deployment_service = DeploymentService(
+        broker,
+        async_session,
+        advertise_host=settings.upk_advertise_host,
+        upk_port=settings.upk_server_port,
+    )
+    deployment_routes.set_service(deployment_service)
+
+    # Robot OTA reports arrive as ordinary MQTT publishes; feed them in.
+    def _on_robot_message(serial, topic, payload):
+        asyncio.ensure_future(deployment_service.handle_report(serial, topic, payload))
+
+    broker.on_message(_on_robot_message)
+
+    upk_server = UPKFileServer(
+        package_dir=settings.package_dir,
+        host=settings.upk_server_host,
+        port=settings.upk_server_port,
+        on_download=deployment_service.handle_download,
+    )
+
     await broker.start()
+    await upk_server.start()
     logger.info("Canopy started")
 
     yield
 
+    await upk_server.stop()
     await broker.stop()
     await engine.dispose()
     logger.info("Canopy stopped")
@@ -106,6 +135,7 @@ def create_app() -> FastAPI:
     app.include_router(fleet_routes.router, prefix="/api/v1")
     app.include_router(command_routes.router, prefix="/api/v1")
     app.include_router(package_routes.router, prefix="/api/v1")
+    app.include_router(deployment_routes.router, prefix="/api/v1")
     app.include_router(audit_routes.router, prefix="/api/v1")
     app.include_router(system_routes.router, prefix="/api/v1")
     app.include_router(websocket_routes.router)

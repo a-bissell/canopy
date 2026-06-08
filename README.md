@@ -14,7 +14,7 @@ It was built as security research and presented at WISCON 2026.
 - **MQTT broker** — a from-scratch MQTT 3.1.1 server that speaks Unitree's serial-based auth, with optional TLS.
 - **Fleet view** — robots auto-register on connect; track status, group them, see live connect/disconnect/message events over WebSocket.
 - **Commands** — send a command to one robot or broadcast to the fleet.
-- **OTA packages** — build Unitree `.upk` packages from a list of commands and download them. *(End-to-end deployment to robots is not yet wired — see Status.)*
+- **OTA packages & deployment** — build Unitree `.upk` packages from a list of commands, then deploy them to all robots, a group, or a list of serials. Canopy serves the package over HTTP, sends each robot an `updateModule` command, and tracks per-robot progress (`sent → downloading → completed/failed`).
 - **Auth & audit** — JWT auth with `admin`/`operator`/`viewer` roles; sensitive actions are written to an audit log.
 - **Web UI** — React dashboard served by the same process.
 
@@ -64,6 +64,8 @@ All settings are environment variables prefixed with `CANOPY_`:
 | `CANOPY_MQTT_REQUIRE_AUTH` | `true` | Require Unitree serial-based auth; `false` accepts any client |
 | `CANOPY_MQTT_CERT_PATH` / `CANOPY_MQTT_KEY_PATH` | unset | Use your own broker cert/key instead of self-signed |
 | `CANOPY_DATABASE_URL` | `sqlite+aiosqlite:///./canopy.db` | SQLAlchemy async DB URL |
+| `CANOPY_UPK_SERVER_PORT` | `8899` | Port the OTA file server serves `.upk` packages on |
+| `CANOPY_UPK_ADVERTISE_HOST` | `127.0.0.1` | Host/IP robots use to reach the OTA file server. Goes into the download URL in the `updateModule` command, so it must be reachable **from the robot**. Set this for any real deployment. |
 | `CANOPY_CORS_ORIGINS` | `["http://localhost:5173","http://127.0.0.1:5173"]` | Browser origins allowed to call the API (JSON list). The bundled UI is same-origin, so this only matters for the standalone Vite dev server. |
 
 ## Development
@@ -79,7 +81,10 @@ npm run dev                      # Vite dev server on :5173, proxying to :8080
 
 ## Status
 
-`v0.1.0` (alpha). Working: broker, fleet tracking, commands, package build/download, auth/RBAC, audit log, live event WebSockets. Not yet implemented: end-to-end OTA deployment orchestration, DDS telemetry ingestion, and video. Automated tests and Alembic migrations are not in place yet (schema is created on startup).
+`v0.1.0` (alpha). Working: broker, fleet tracking, commands, package build/download, OTA deployment orchestration, auth/RBAC, audit log, live event WebSockets. Not yet implemented: DDS telemetry ingestion and video. Alembic migrations are not in place yet (schema is created on startup).
+
+> [!NOTE]
+> OTA deployment drives `sent` and `downloading` from concrete signals (MQTT publish, file-server hit). The terminal `completed`/`failed` transition depends on a robot's OTA report, whose exact MQTT topic/format has not yet been confirmed against firmware — see `handle_report` in [`canopy/packages/deployment.py`](canopy/packages/deployment.py).
 
 ## License
 
