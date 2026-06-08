@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 
@@ -18,8 +18,29 @@ export default function PackageBuilder() {
   const [commands, setCommands] = useState<CommandEntry[]>([
     { Cmd: '', Delay: 0, ExpectCode: [0], IgnoreUnexpected: true },
   ]);
+  const [templates, setTemplates] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.packageTemplates().then(setTemplates).catch(() => {});
+  }, []);
+
+  const applyTemplate = (tplName: string) => {
+    const t = templates.find((x) => x.name === tplName);
+    if (!t) return;
+    // Prefill everything except the name — the operator names their own copy
+    // (and it avoids colliding with the seeded example of the same name).
+    setName('');
+    setVersion(t.version);
+    setModuleName(t.module_name);
+    setDescription(t.description);
+    setCommands(t.commands.map((c: any) => ({
+      Cmd: c.Cmd, Delay: c.Delay ?? 0,
+      ExpectCode: c.ExpectCode ?? [0], IgnoreUnexpected: c.IgnoreUnexpected ?? true,
+    })));
+    setError('');
+  };
 
   const addCommand = () => setCommands([...commands, { Cmd: '', Delay: 0, ExpectCode: [0], IgnoreUnexpected: true }]);
   const removeCommand = (i: number) => setCommands(commands.filter((_, idx) => idx !== i));
@@ -58,6 +79,17 @@ export default function PackageBuilder() {
           <span className="link" onClick={() => navigate('/packages')}>← Back</span>
           <div className="page-title">Create Package</div>
         </div>
+        {templates.length > 0 && (
+          <select
+            className="cmd-sel"
+            style={{ maxWidth: 220 }}
+            value=""
+            onChange={(e) => applyTemplate(e.target.value)}
+          >
+            <option value="">Start from template…</option>
+            {templates.map((t) => <option key={t.name} value={t.name}>{t.name}</option>)}
+          </select>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, maxWidth: 980 }}>

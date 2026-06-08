@@ -82,7 +82,6 @@ function CreateModal({ packages, onClose, onCreated }: {
   const [packageId, setPackageId] = useState(packages[0]?.id || '');
   const [targetType, setTargetType] = useState('all');
   const [targetValue, setTargetValue] = useState('');
-  const [strategy, setStrategy] = useState('immediate');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -95,7 +94,6 @@ function CreateModal({ packages, onClose, onCreated }: {
         package_id: packageId,
         target_type: targetType,
         target_value: targetType === 'all' ? undefined : targetValue,
-        strategy,
       });
       onCreated();
     } catch (e: any) {
@@ -135,13 +133,6 @@ function CreateModal({ packages, onClose, onCreated }: {
                 placeholder={targetType === 'group' ? 'group-uuid' : 'B42D…, B42E…'} />
             </div>
           )}
-          <div className="field">
-            <span className="field-label">Strategy</span>
-            <select className="cmd-sel" value={strategy} onChange={(e) => setStrategy(e.target.value)}>
-              <option value="immediate">Immediate</option>
-              <option value="staged">Staged</option>
-            </select>
-          </div>
           {error && <div className="err-text">{error}</div>}
         </div>
         <div className="modal-foot">

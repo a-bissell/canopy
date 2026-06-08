@@ -35,6 +35,15 @@ class PackageOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PackageTemplateOut(BaseModel):
+    """A built-in example used as a starting point in the Package Builder."""
+    name: str
+    version: str
+    module_name: str
+    description: str
+    commands: list[CommandEntry]
+
+
 class DeploymentCreate(BaseModel):
     package_id: str
     target_type: str  # "all", "group", "serial_list"

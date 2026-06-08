@@ -109,6 +109,7 @@ export const api = {
   sendCommand: (serial: string, payload: any) => request<any>(`/command/${serial}`, { method: 'POST', body: JSON.stringify({ payload }) }),
   broadcast: (payload: any) => request<any>('/command/broadcast', { method: 'POST', body: JSON.stringify({ payload }) }),
   listPackages: () => request<any[]>('/packages'),
+  packageTemplates: () => request<any[]>('/packages/templates'),
   createPackage: (data: any) => request<any>('/packages', { method: 'POST', body: JSON.stringify(data) }),
   listDeployments: () => request<any[]>('/deployments'),
   getDeployment: (id: string) => request<any>(`/deployments/${id}`),

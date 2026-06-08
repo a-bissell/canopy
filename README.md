@@ -23,7 +23,7 @@ It was built as security research and presented at WISCON 2026.
 ### Docker (recommended)
 
 ```bash
-# Generate a real secret before exposing this anywhere.
+# Optional: pin a known signing key (otherwise one is generated on first boot).
 export CANOPY_SECRET_KEY="$(openssl rand -hex 32)"
 docker compose up --build
 ```
@@ -47,7 +47,7 @@ password: canopy
 ```
 
 > [!IMPORTANT]
-> Change the admin password immediately (`PUT /api/v1/auth/password`, or via the UI) and set a strong `CANOPY_SECRET_KEY` **before** the first run. Tokens are signed with that key — leaving the default makes them forgeable.
+> Change the admin password immediately (`PUT /api/v1/auth/password`, or via the UI). If you don't set `CANOPY_SECRET_KEY`, Canopy generates a random one on first boot and persists it to `data/secret_key` so issued tokens survive restarts — set it explicitly when you need a known key across redeploys or multiple instances.
 
 ## Configuration
 
@@ -55,7 +55,7 @@ All settings are environment variables prefixed with `CANOPY_`:
 
 | Variable | Default | Description |
 |---|---|---|
-| `CANOPY_SECRET_KEY` | `change-me-in-production` | JWT signing key. **Override in production.** |
+| `CANOPY_SECRET_KEY` | _(auto-generated)_ | JWT signing key. If unset, a random key is generated on first boot and saved to `data/secret_key`. Override to pin a known key across instances. |
 | `CANOPY_HOST` | `0.0.0.0` | API bind address |
 | `CANOPY_API_PORT` | `8080` | API / UI port |
 | `CANOPY_MQTT_HOST` | `0.0.0.0` | Broker bind address |
@@ -81,10 +81,16 @@ npm run dev                      # Vite dev server on :5173, proxying to :8080
 
 ## Status
 
-`v0.1.0` (alpha). Working: broker, fleet tracking, commands, package build/download, OTA deployment orchestration, auth/RBAC, audit log, live event WebSockets. Not yet implemented: DDS telemetry ingestion and video. Alembic migrations are not in place yet (schema is created on startup).
+`v0.1.0` (alpha). Working: broker, fleet tracking, commands, package build/download, OTA deployment orchestration, auth/RBAC, audit log, live event WebSockets. The full broker → auth → deploy → UPK download → report loop has been verified end-to-end against a live Go2.
+
+**Known limitations (alpha):**
+- **Rollout is immediate only** — packages dispatch to all matching connected robots at once. Phased/staged rollout is not implemented.
+- **No schema migrations** — the database is created on startup; expect to reset it between versions.
+- **No login rate limiting**, and audit-log export loads all matching rows into memory.
+- **No DDS telemetry or video** — these integrations are stubbed, not implemented.
 
 > [!NOTE]
-> OTA deployment drives `sent` and `downloading` from concrete signals (MQTT publish, file-server hit). The terminal `completed`/`failed` transition depends on a robot's OTA report, whose exact MQTT topic/format has not yet been confirmed against firmware — see `handle_report` in [`canopy/packages/deployment.py`](canopy/packages/deployment.py).
+> The terminal `completed`/`failed` transition comes from the robot's `reportVersion` OTA message; `sent`/`downloading` are driven by concrete signals (MQTT publish, file-server hit). The report format was confirmed against Go2 firmware — see `handle_report` in [`canopy/packages/deployment.py`](canopy/packages/deployment.py).
 
 ## License
 
