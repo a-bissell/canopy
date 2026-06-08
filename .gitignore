@@ -36,5 +36,8 @@ alembic/versions/__pycache__/
 # Claude Code tooling
 .claude/
 
+# Research / standalone tools (not part of the package)
+upk_tool.py
+
 # Docker
 docker-compose.override.yml
