@@ -28,6 +28,7 @@ from .db.engine import async_session, engine
 from .db.models import Base, User
 from .fleet.manager import FleetManager
 from .packages.deployment import DeploymentService
+from .packages.examples import seed_example_packages
 from .packages.file_server import UPKFileServer
 
 logger = logging.getLogger("canopy")
@@ -61,6 +62,9 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await _ensure_admin_user()
+
+    async with async_session() as session:
+        await seed_example_packages(session, settings.package_dir)
 
     cert_path = Path(settings.mqtt_cert_path) if settings.mqtt_cert_path else None
     key_path = Path(settings.mqtt_key_path) if settings.mqtt_key_path else None

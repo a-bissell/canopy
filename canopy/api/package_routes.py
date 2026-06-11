@@ -13,7 +13,8 @@ from ..config import settings
 from ..db.engine import get_session
 from ..db.models import Package
 from ..packages.builder import build_package_to_file
-from ..packages.schemas import PackageCreate, PackageOut
+from ..packages.examples import EXAMPLE_PACKAGES
+from ..packages.schemas import PackageCreate, PackageOut, PackageTemplateOut
 
 router = APIRouter(prefix="/packages", tags=["packages"])
 
@@ -27,6 +28,17 @@ async def list_packages(
         select(Package).where(Package.is_archived == False).order_by(Package.created_at.desc())
     )
     return result.scalars().all()
+
+
+@router.get("/templates", response_model=list[PackageTemplateOut])
+async def list_templates(
+    _: CurrentUser = Depends(require_role("viewer")),
+):
+    """Built-in example packages, used as starting points in the builder.
+
+    Declared before /{package_id} so the literal path isn't captured as an id.
+    """
+    return [PackageTemplateOut(**t) for t in EXAMPLE_PACKAGES]
 
 
 @router.get("/{package_id}", response_model=PackageOut)
