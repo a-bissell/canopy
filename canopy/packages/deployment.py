@@ -30,6 +30,11 @@ ACTIVE_TARGET_STATES = ("pending", "sent", "downloading")
 _TERMINAL = ("completed", "failed")
 
 
+def _mqtt_alias(module_name: str) -> str:
+    """Short alias used as MQTT moduleName to avoid download path collision."""
+    return module_name[:2]
+
+
 def parse_serials(value: str | None) -> list[str]:
     """Parse a serial_list target_value (JSON array or comma-separated)."""
     if not value:
@@ -112,6 +117,7 @@ class DeploymentService:
                 url=self._url_for(package),
                 sign=package.file_hash,
                 size=package.file_size,
+                mqtt_module_name=_mqtt_alias(package.module_name),
             )
 
             now = datetime.now(timezone.utc)
@@ -249,9 +255,13 @@ class DeploymentService:
             affected: set[str] = set()
 
             for target, package in rows:
-                if package.module_name not in reported:
-                    continue  # this module not mentioned — not our deployment
-                rep_version, rep_code = reported[package.module_name]
+                alias = _mqtt_alias(package.module_name)
+                if package.module_name in reported:
+                    rep_version, rep_code = reported[package.module_name]
+                elif alias in reported:
+                    rep_version, rep_code = reported[alias]
+                else:
+                    continue
                 if rep_version != package.version:
                     continue  # wrong version — different deployment or downgrade
 
