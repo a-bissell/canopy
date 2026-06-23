@@ -49,6 +49,49 @@ password: canopy
 > [!IMPORTANT]
 > Change the admin password immediately (`PUT /api/v1/auth/password`, or via the UI). If you don't set `CANOPY_SECRET_KEY`, Canopy generates a random one on first boot and persists it to `data/secret_key` so issued tokens survive restarts — set it explicitly when you need a known key across redeploys or multiple instances.
 
+## Connecting a robot
+
+Canopy is a drop-in replacement for Unitree's cloud broker, so **you don't install anything on the robot**. The stock on-board OTA agent (`ota_boxed`) already connects to `global-robot-mqtt.unitree.com:17883` over TLS and authenticates with the robot's serial. Pointing that hostname at your Canopy instance is all it takes — the robot auto-registers and shows up in the fleet view on its next connection.
+
+### 1. Find the robot's serial
+
+The serial is what Canopy uses to identify and authenticate the robot. On a Go2 it lives at `/unitree/robot/basic/code`:
+
+```bash
+ssh root@<robot-ip>
+cat /unitree/robot/basic/code     # e.g. B42D1000O747MN8Y
+```
+
+### 2. Point the robot at Canopy
+
+Pick one of two approaches on the robot.
+
+**Option A — DNS/hosts redirect (no robot config changes).** Redirect Unitree's broker hostnames to your Canopy host so the unmodified agent dials Canopy. Add to the robot's `/etc/hosts`:
+
+```
+<canopy-host-ip>   global-robot-mqtt.unitree.com
+<canopy-host-ip>   robot-mqtt.unitree.com
+```
+
+Canopy's self-signed broker cert is issued for exactly these hostnames, so TLS lines up. (If the robot pins or verifies a CA you'll need to install Canopy's CA from `data/certs/ca.pem`; the stock Go2 agent does not verify.)
+
+**Option B — edit the MQTT client config.** Point the agent directly at your host/IP in `/unitree/etc/mqtt/mqtt_client_conf.json`, leaving the broker hostnames alone.
+
+Either way the robot connects to port `17883`. Restart the agent or reboot the robot to force a reconnect.
+
+### 3. Make sure Canopy is reachable
+
+- The broker port (`17883`, TLS by default) must be reachable **from the robot**.
+- For OTA, set `CANOPY_UPK_ADVERTISE_HOST` to an address the robot can reach (see [Configuration](#configuration)) — it goes into the package download URL.
+- The robot and Canopy host need to be on the same network or otherwise routable to each other.
+
+### 4. Confirm in the fleet view
+
+Open the Web UI at `http://<canopy-host>:8080`. On the robot's next connection it registers automatically and appears in the fleet view, where you can see its status and live connect/message events, send it commands, and target it for OTA deployments.
+
+> [!NOTE]
+> Authentication uses Unitree's publicly known scheme: client id `unitree_robot_<serial>`, username = serial, password `1|md5("unitree-<serial>-<nonce>")|<nonce>` (see [`canopy/broker/auth.py`](canopy/broker/auth.py)). Any client that can reach the broker port and speak this scheme can register, so restrict access at the network layer (or set the broker's `allowed_serials`) when testing against hardware that isn't yours. Set `CANOPY_MQTT_REQUIRE_AUTH=false` only for a quick local bring-up — it accepts any client.
+
 ## Configuration
 
 All settings are environment variables prefixed with `CANOPY_`:
